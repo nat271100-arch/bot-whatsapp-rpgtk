@@ -3,7 +3,7 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 
-const ADMIN = "whatsapp:+55SEUNUMERO";
+const ADMIN = "whatsapp:+5541991656120";
 
 // 💾 MEMÓRIA
 let jogadores = {};
