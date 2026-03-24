@@ -3,14 +3,14 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 
-const ADMIN = "whatsapp:+5541991656120";
+const ADMIN = "whatsapp:+554191656120";
 
 // 💾 MEMÓRIA
 let jogadores = {};
 let aparenciasUsadas = [];
 let estados = {};
 
-// 🧚 Afinidades + buffs
+// 🧚 Afinidades
 const afinidades = {
   "Natureza 🌿": { defesa: 2, vitalidade: 1 },
   "Água 💧": { vitalidade: 2, magia: 1 },
@@ -52,6 +52,21 @@ app.post("/bot", (req, res) => {
     resposta = "❌ Criação cancelada.";
   }
 
+  // VOLTAR
+  else if (msg === "!voltar") {
+    if (!estados[numero] || estados[numero].historico.length === 0) {
+      resposta = "❌ Não há etapa anterior.";
+    } else {
+      let anterior = estados[numero].historico.pop();
+
+      estados[numero].etapa = anterior.etapa;
+      estados[numero].pontosRestantes = anterior.pontosRestantes;
+      estados[numero].dados = anterior.dados;
+
+      resposta = `⏪ Voltou para: ${estados[numero].etapa}`;
+    }
+  }
+
   // CRIAR
   else if (msg === "!criar") {
 
@@ -65,7 +80,8 @@ app.post("/bot", (req, res) => {
       estados[numero] = {
         etapa: "nome",
         dados: {},
-        pontosRestantes: 20
+        pontosRestantes: 20,
+        historico: []
       };
       resposta = "🧚 Vamos criar sua fada!\nQual o nome?";
     }
@@ -75,8 +91,17 @@ app.post("/bot", (req, res) => {
   else if (estados[numero]) {
     let estado = estados[numero];
 
+    function salvarHistorico() {
+      estado.historico.push({
+        etapa: estado.etapa,
+        pontosRestantes: estado.pontosRestantes,
+        dados: { ...estado.dados }
+      });
+    }
+
     // NOME
     if (estado.etapa === "nome") {
+      salvarHistorico();
       estado.dados.nome = msgOriginal;
       estado.etapa = "idade";
       resposta = "🎂 Qual a idade?";
@@ -84,6 +109,7 @@ app.post("/bot", (req, res) => {
 
     // IDADE
     else if (estado.etapa === "idade") {
+      salvarHistorico();
       estado.dados.idade = msgOriginal;
       estado.etapa = "aparencia";
       resposta = "🎭 Descreva a aparência:";
@@ -95,6 +121,7 @@ app.post("/bot", (req, res) => {
       if (aparenciasUsadas.includes(msgOriginal.toLowerCase())) {
         resposta = "❌ Aparência já usada. Escolha outra.";
       } else {
+        salvarHistorico();
         estado.dados.aparencia = msgOriginal;
         aparenciasUsadas.push(msgOriginal.toLowerCase());
         estado.etapa = "item";
@@ -104,9 +131,26 @@ app.post("/bot", (req, res) => {
 
     // ITEM
     else if (estado.etapa === "item") {
+      salvarHistorico();
       estado.dados.item = msgOriginal;
       estado.etapa = "vitalidade";
-      resposta = "❤️ Vitalidade? (Restam 20)";
+
+      resposta = `📊 DISTRIBUIÇÃO DE ATRIBUTOS
+
+Você tem 20 pontos para distribuir.
+
+Atributos:
+❤️ Vitalidade (resistência)
+⚔️ Força (dano físico)
+✨ Magia (poder mágico)
+🛡️ Defesa (proteção)
+💨 Destreza (velocidade)
+
+⚠️ Mínimo: 1 por atributo
+
+Começando:
+
+❤️ Quanto em Vitalidade? (Restam 20)`;
     }
 
     // ATRIBUTOS
@@ -119,6 +163,8 @@ app.post("/bot", (req, res) => {
       if (isNaN(valor) || valor < 1 || valor > estado.pontosRestantes) {
         resposta = `❌ Valor inválido. Restam ${estado.pontosRestantes}`;
       } else {
+        salvarHistorico();
+
         estado.dados[atual] = valor;
         estado.pontosRestantes -= valor;
 
@@ -126,10 +172,10 @@ app.post("/bot", (req, res) => {
 
         if (index < atributos.length - 1) {
           estado.etapa = atributos[index + 1];
-          resposta = `➡️ ${estado.etapa}? (Restam ${estado.pontosRestantes})`;
+          resposta = `➡️ ${estado.etapa.toUpperCase()}? (Restam ${estado.pontosRestantes})`;
         } else {
 
-          // AFINIDADES
+          // Afinidades
           let afinidade1 = sortearAfinidade();
           let afinidade2;
 
@@ -137,7 +183,6 @@ app.post("/bot", (req, res) => {
             afinidade2 = sortearAfinidade();
           } while (afinidade2 === afinidade1);
 
-          // BUFFS
           let buffs1 = afinidades[afinidade1];
           let buffs2 = afinidades[afinidade2];
 
@@ -149,7 +194,6 @@ app.post("/bot", (req, res) => {
             estado.dados[key] += 1;
           }
 
-          // CRIAR PERSONAGEM
           let personagem = {
             ...estado.dados,
             id: gerarID(),
@@ -246,6 +290,7 @@ app.post("/bot", (req, res) => {
 !perfil 1
 !perfil 2
 !historia texto
+!voltar
 !cancelar`;
   }
 
