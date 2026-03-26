@@ -54,6 +54,11 @@ function isAdmin(numero) {
   return admins.includes(numero);
 }
 
+function logar(texto) {
+  logs.push(texto);
+  if (logs.length > 50) logs.shift(); // mantém últimos 50
+}
+
 function buscarPersonagem(id) {
   for (let num in jogadores) {
     let p = jogadores[num].personagens.find(x => x.id === id);
@@ -86,16 +91,17 @@ if (msg === "!menu") {
 📩 !solicitar texto
 
 ━━━━━━━━━━
-👑 ADM
+👑 MODO MESTRE
 
 !painel
 !lista
 !ver P-ID
+!log
 !solicitacoes
 !aprovar S-ID
 !recusar S-ID
-!missao criar
-!evento`;
+!del P-ID
+!delinfo P-ID campo`;
 }
 
 // =========================
@@ -123,7 +129,7 @@ else if (msg === "!criar") {
 }
 
 // =========================
-// 🧠 FLUXO DE CRIAÇÃO
+// 🧠 CRIAÇÃO FLUXO
 // =========================
 else if (estados[numero]) {
 
@@ -226,26 +232,11 @@ Vitalidade?`;
 
         jogadores[numero].personagens.push(p);
 
-        let simbolo = simbolosAfinidade[a1] || "✨🧚";
+        logar(`Novo personagem: ${p.nome} (${p.id})`);
 
-        resposta = `𖥸𓆰${simbolo}𓆰𖥸
-
-🧚 ${p.nome}
-🆔 ${p.id}
-
-✨ ${a1} | ${a2}
-
-📊 FINAL:
-❤️ ${p.finais.vitalidade}
-⚔️ ${p.finais.forca}
-✨ ${p.finais.magia}
-🛡️ ${p.finais.defesa}
-💨 ${p.finais.destreza}
-
-🎒 ${p.inventario[0]}
-
-𖥸𓆰${simbolo}𓆰𖥸`;
-
+        resposta = `🧚 ${p.nome} criado!
+🆔 ${p.id}`;
+        
         delete estados[numero];
       }
     }
@@ -257,7 +248,7 @@ Vitalidade?`;
 // =========================
 else if (msg === "!d20") {
   let r = Math.floor(Math.random() * 20) + 1;
-  logs.push(`${numero} rolou ${r}`);
+  logar(`${numero} rolou ${r}`);
   resposta = `🎲 Resultado: ${r}`;
 }
 
@@ -276,6 +267,8 @@ else if (msg.startsWith("!solicitar")) {
     status: "pendente"
   });
 
+  logar(`Solicitação ${id}: ${texto}`);
+
   resposta = `📩 Enviado (${id})`;
 }
 
@@ -283,7 +276,7 @@ else if (msg.startsWith("!solicitar")) {
 // 👑 APROVAÇÃO
 // =========================
 else if (msg === "!solicitacoes" && isAdmin(numero)) {
-  resposta = solicitacoes.map(s => `${s.id} | ${s.texto}`).join("\n") || "Nenhuma";
+  resposta = solicitacoes.map(s => `${s.id} | ${s.texto} (${s.status})`).join("\n") || "Nenhuma";
 }
 
 else if (msg.startsWith("!aprovar") && isAdmin(numero)) {
@@ -291,6 +284,7 @@ else if (msg.startsWith("!aprovar") && isAdmin(numero)) {
   let s = solicitacoes.find(x => x.id === id);
   if (s) {
     s.status = "aprovado";
+    logar(`Aprovado: ${id}`);
     resposta = "Aprovado";
   }
 }
@@ -300,6 +294,7 @@ else if (msg.startsWith("!recusar") && isAdmin(numero)) {
   let s = solicitacoes.find(x => x.id === id);
   if (s) {
     s.status = "recusado";
+    logar(`Recusado: ${id}`);
     resposta = "Recusado";
   }
 }
@@ -334,24 +329,11 @@ else if (msg.startsWith("!ver") && isAdmin(numero)) {
 
   if (!p) resposta = "❌ Não encontrado";
   else {
+
     resposta = `🧚 ${p.nome}
 🆔 ${p.id}
 
-Base:
-❤️ ${p.vitalidade}
-⚔️ ${p.forca}
-✨ ${p.magia}
-🛡️ ${p.defesa}
-💨 ${p.destreza}
-
-Buff:
-❤️ +${p.buffs.vitalidade}
-⚔️ +${p.buffs.forca}
-✨ +${p.buffs.magia}
-🛡️ +${p.buffs.defesa}
-💨 +${p.buffs.destreza}
-
-Final:
+📊 FINAL:
 ❤️ ${p.finais.vitalidade}
 ⚔️ ${p.finais.forca}
 ✨ ${p.finais.magia}
@@ -361,26 +343,53 @@ Final:
 }
 
 // =========================
-// 🌑 EVENTO
+// 🗑️ DELETAR
 // =========================
-else if (msg === "!evento" && isAdmin(numero)) {
-  resposta = "🌑 Um evento foi iniciado...";
+else if (msg.startsWith("!del") && isAdmin(numero)) {
+
+  let id = msg.split(" ")[1];
+
+  for (let j in jogadores) {
+    jogadores[j].personagens =
+      jogadores[j].personagens.filter(p => p.id !== id);
+  }
+
+  logar(`ADM deletou ${id}`);
+  resposta = "Deletado";
 }
 
 // =========================
-// 🧾 MISSÃO
+// 🧹 DEL INFO
 // =========================
-else if (msg === "!missao criar" && isAdmin(numero)) {
-  let m = { id: gerarID("M",4), nome: "Missão", concluida:false };
-  missoes.push(m);
-  resposta = `Missão criada (${m.id})`;
+else if (msg.startsWith("!delinfo") && isAdmin(numero)) {
+
+  let partes = msg.split(" ");
+  let id = partes[1];
+  let campo = partes[2];
+
+  let p = buscarPersonagem(id);
+
+  if (p && p[campo] !== undefined) {
+    p[campo] = "";
+    logar(`ADM removeu ${campo} de ${id}`);
+    resposta = "Removido";
+  } else {
+    resposta = "Erro";
+  }
+}
+
+// =========================
+// 📜 LOG
+// =========================
+else if (msg === "!log" && isAdmin(numero)) {
+  resposta = logs.join("\n") || "Sem registros";
 }
 
 // =========================
 // 👑 PAINEL
 // =========================
 else if (msg === "!painel" && isAdmin(numero)) {
-  resposta = `📊 Painel
+  resposta = `📊 RPG
 
 Jogadores: ${Object.keys(jogadores).length}
 Missões: ${missoes.length}
