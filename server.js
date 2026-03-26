@@ -3,19 +3,24 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 
+// =========================
 // 👑 ADM
-let admins = ["whatsapp:+554191656120"];
+// =========================
+let admins = ["whatsapp:+55SEUNUMERO"];
 
+// =========================
 // 💾 MEMÓRIA
+// =========================
 let jogadores = {};
 let estados = {};
 let aparenciasUsadas = [];
 let missoes = [];
-let arcos = [];
 let logs = [];
 let solicitacoes = [];
 
+// =========================
 // 🧬 AFINIDADES
+// =========================
 const afinidades = {
   "Natureza 🌿": { defesa: 2, vitalidade: 1 },
   "Água 💧": { vitalidade: 2, magia: 1 },
@@ -34,6 +39,9 @@ const simbolosAfinidade = {
 
 const listaAfinidades = Object.keys(afinidades);
 
+// =========================
+// 🔧 FUNÇÕES
+// =========================
 function sortearAfinidade() {
   return listaAfinidades[Math.floor(Math.random() * listaAfinidades.length)];
 }
@@ -54,40 +62,9 @@ function buscarPersonagem(id) {
   return null;
 }
 
-// 🌑 EVENTO
-function gerarEvento() {
-  return `🌑 EVENTO
-
-Algo estranho acontece...
-
-🎭 Situação:
-Instabilidade na região
-
-⚠️ Complicação:
-Origem desconhecida
-
-🎯 Ação:
-Investigar ou evitar
-
-✨ Consequência:
-Pode afetar o equilíbrio`;
-}
-
-// 🧾 MISSÃO
-function gerarMissao() {
-  return {
-    id: gerarID("M", 4),
-    nome: "Sussurros na Floresta",
-    contexto: "Uma fada desapareceu",
-    objetivo: "Investigar",
-    concluida: false
-  };
-}
-
 // =========================
 // 🤖 BOT
 // =========================
-
 app.post("/bot", (req, res) => {
 
   const msgOriginal = req.body.Body || "";
@@ -99,7 +76,6 @@ app.post("/bot", (req, res) => {
 // =========================
 // 📜 MENU
 // =========================
-
 if (msg === "!menu") {
   resposta = `📖 MENU
 
@@ -107,23 +83,24 @@ if (msg === "!menu") {
 🧾 !perfil 1 / 2
 🎨 !placa P-ID
 🎲 !d20
-
-📩 !solicitar [pedido]
+📩 !solicitar texto
 
 ━━━━━━━━━━
-
 👑 ADM
 
 !painel
+!lista
+!ver P-ID
+!solicitacoes
+!aprovar S-ID
+!recusar S-ID
 !missao criar
-!evento
-!del P-ID`;
+!evento`;
 }
 
 // =========================
 // 🧚 CRIAÇÃO
 // =========================
-
 else if (msg === "!criar") {
 
   if (!jogadores[numero]) {
@@ -146,9 +123,8 @@ else if (msg === "!criar") {
 }
 
 // =========================
-// 🧠 FLUXO
+// 🧠 FLUXO DE CRIAÇÃO
 // =========================
-
 else if (estados[numero]) {
 
   let e = estados[numero];
@@ -173,7 +149,7 @@ else if (estados[numero]) {
 
   else if (e.etapa === "aparencia") {
     if (aparenciasUsadas.includes(msgOriginal.toLowerCase())) {
-      resposta = "❌ Aparência repetida.";
+      resposta = "❌ Aparência já usada.";
     } else {
       e.dados.aparencia = msgOriginal;
       aparenciasUsadas.push(msgOriginal.toLowerCase());
@@ -201,7 +177,7 @@ Vitalidade?`;
 
   else {
     const atb = ["vitalidade","forca","magia","defesa","destreza"];
-    let atual = atb.find(x => x === e.etapa);
+    let atual = e.etapa;
     let valor = parseInt(msgOriginal);
 
     if (isNaN(valor) || valor < 1 || valor > e.pontos) {
@@ -218,11 +194,31 @@ Vitalidade?`;
         resposta = `${e.etapa}? (${e.pontos})`;
       } else {
 
+        let a1 = sortearAfinidade();
+        let a2 = sortearAfinidade();
+
+        let buffs = { vitalidade:0, forca:0, magia:0, defesa:0, destreza:0 };
+
+        [a1, a2].forEach(a => {
+          let b = afinidades[a];
+          for (let k in b) buffs[k] += b[k];
+        });
+
+        let finais = {
+          vitalidade: e.dados.vitalidade + buffs.vitalidade,
+          forca: e.dados.forca + buffs.forca,
+          magia: e.dados.magia + buffs.magia,
+          defesa: e.dados.defesa + buffs.defesa,
+          destreza: e.dados.destreza + buffs.destreza
+        };
+
         let p = {
           ...e.dados,
           id: gerarID("P",6),
-          afinidade1: sortearAfinidade(),
-          afinidade2: sortearAfinidade(),
+          afinidade1: a1,
+          afinidade2: a2,
+          buffs,
+          finais,
           historia: "",
           inventario: [e.dados.item],
           visual: {}
@@ -230,10 +226,25 @@ Vitalidade?`;
 
         jogadores[numero].personagens.push(p);
 
-        resposta = `🧚 Criado!
+        let simbolo = simbolosAfinidade[a1] || "✨🧚";
 
-${p.nome}
-${p.id}`;
+        resposta = `𖥸𓆰${simbolo}𓆰𖥸
+
+🧚 ${p.nome}
+🆔 ${p.id}
+
+✨ ${a1} | ${a2}
+
+📊 FINAL:
+❤️ ${p.finais.vitalidade}
+⚔️ ${p.finais.forca}
+✨ ${p.finais.magia}
+🛡️ ${p.finais.defesa}
+💨 ${p.finais.destreza}
+
+🎒 ${p.inventario[0]}
+
+𖥸𓆰${simbolo}𓆰𖥸`;
 
         delete estados[numero];
       }
@@ -242,89 +253,21 @@ ${p.id}`;
 }
 
 // =========================
-// 🧾 PERFIL
-// =========================
-
-else if (msg.startsWith("!perfil")) {
-  let i = parseInt(msg.split(" ")[1]) - 1;
-  let p = jogadores[numero]?.personagens[i];
-
-  resposta = p ? `${p.nome} (${p.id})` : "❌ Não encontrado";
-}
-
-// =========================
-// 🎨 PLACA
-// =========================
-
-else if (msg.startsWith("!placa")) {
-
-  let id = msgOriginal.split(" ")[1];
-  let p = buscarPersonagem(id);
-
-  if (!p) resposta = "❌ Não encontrado";
-  else {
-
-    let simbolo = p.visual.simbolo || simbolosAfinidade[p.afinidade1] || "✨🧚";
-    let titulo = p.visual.titulo || "Fada";
-    let frase = p.visual.frase || "";
-
-    resposta = `𖥸𓆰${simbolo}𓆰𖥸
-
-${p.nome} (${p.id})
-${p.idade} anos
-
-${p.aparencia}
-
-${p.afinidade1} | ${p.afinidade2}
-
-${titulo}
-
-${frase}`;
-  }
-}
-
-// =========================
-// 🎨 PLAYER EDIT
-// =========================
-
-else if (msg.startsWith("!minhaplaca")) {
-
-  let partes = msgOriginal.split(" ");
-  let campo = partes[1];
-  let valor = partes.slice(2).join(" ");
-
-  let p = jogadores[numero]?.personagens[0];
-
-  if (!p) resposta = "❌ Sem personagem";
-  else {
-    if (!p.visual) p.visual = {};
-    p.visual[campo] = valor;
-    resposta = "🎨 Atualizado";
-  }
-}
-
-// =========================
 // 🎲 D20
 // =========================
-
 else if (msg === "!d20") {
-
   let r = Math.floor(Math.random() * 20) + 1;
-
-  resposta = `🎲 Resultado: ${r}`;
-
   logs.push(`${numero} rolou ${r}`);
+  resposta = `🎲 Resultado: ${r}`;
 }
 
 // =========================
 // 📩 SOLICITAÇÕES
 // =========================
-
 else if (msg.startsWith("!solicitar")) {
 
   let texto = msgOriginal.replace("!solicitar ", "");
-
-  let id = gerarID("S", 4);
+  let id = gerarID("S",4);
 
   solicitacoes.push({
     id,
@@ -333,98 +276,111 @@ else if (msg.startsWith("!solicitar")) {
     status: "pendente"
   });
 
-  resposta = `📩 Pedido enviado!
-
-ID: ${id}`;
+  resposta = `📩 Enviado (${id})`;
 }
 
 // =========================
-// 👑 VER SOLICITAÇÕES
+// 👑 APROVAÇÃO
 // =========================
-
 else if (msg === "!solicitacoes" && isAdmin(numero)) {
-
-  let lista = solicitacoes
-    .filter(s => s.status === "pendente")
-    .map(s => `${s.id} | ${s.texto}`)
-    .join("\n") || "Nenhuma";
-
-  resposta = lista;
+  resposta = solicitacoes.map(s => `${s.id} | ${s.texto}`).join("\n") || "Nenhuma";
 }
-
-// =========================
-// ✅ APROVAR
-// =========================
 
 else if (msg.startsWith("!aprovar") && isAdmin(numero)) {
-
   let id = msg.split(" ")[1];
   let s = solicitacoes.find(x => x.id === id);
-
-  if (!s) resposta = "Erro";
-  else {
+  if (s) {
     s.status = "aprovado";
     resposta = "Aprovado";
   }
 }
 
-// =========================
-// ❌ RECUSAR
-// =========================
-
 else if (msg.startsWith("!recusar") && isAdmin(numero)) {
-
   let id = msg.split(" ")[1];
   let s = solicitacoes.find(x => x.id === id);
-
-  if (!s) resposta = "Erro";
-  else {
+  if (s) {
     s.status = "recusado";
     resposta = "Recusado";
   }
 }
 
 // =========================
-// 🧾 MISSÕES
+// 📊 LISTA
 // =========================
+else if (msg === "!lista" && isAdmin(numero)) {
 
-else if (msg === "!missao criar" && isAdmin(numero)) {
-  let m = gerarMissao();
-  missoes.push(m);
-  resposta = `${m.nome} (${m.id})`;
+  let lista = "";
+
+  for (let num in jogadores) {
+    let j = jogadores[num];
+
+    j.personagens.forEach(p => {
+      lista += `👤 ${j.nomeJogador || "Sem nome"}
+🧚 ${p.nome}
+🆔 ${p.id}\n\n`;
+    });
+  }
+
+  resposta = lista || "Nenhum personagem.";
+}
+
+// =========================
+// 🔍 VER
+// =========================
+else if (msg.startsWith("!ver") && isAdmin(numero)) {
+
+  let id = msg.split(" ")[1];
+  let p = buscarPersonagem(id);
+
+  if (!p) resposta = "❌ Não encontrado";
+  else {
+    resposta = `🧚 ${p.nome}
+🆔 ${p.id}
+
+Base:
+❤️ ${p.vitalidade}
+⚔️ ${p.forca}
+✨ ${p.magia}
+🛡️ ${p.defesa}
+💨 ${p.destreza}
+
+Buff:
+❤️ +${p.buffs.vitalidade}
+⚔️ +${p.buffs.forca}
+✨ +${p.buffs.magia}
+🛡️ +${p.buffs.defesa}
+💨 +${p.buffs.destreza}
+
+Final:
+❤️ ${p.finais.vitalidade}
+⚔️ ${p.finais.forca}
+✨ ${p.finais.magia}
+🛡️ ${p.finais.defesa}
+💨 ${p.finais.destreza}`;
+  }
 }
 
 // =========================
 // 🌑 EVENTO
 // =========================
-
-else if (msg.startsWith("!evento") && isAdmin(numero)) {
-  resposta = gerarEvento();
+else if (msg === "!evento" && isAdmin(numero)) {
+  resposta = "🌑 Um evento foi iniciado...";
 }
 
 // =========================
-// ❌ DELETAR
+// 🧾 MISSÃO
 // =========================
-
-else if (msg.startsWith("!del") && isAdmin(numero)) {
-
-  let id = msg.split(" ")[1];
-
-  for (let j in jogadores) {
-    jogadores[j].personagens =
-      jogadores[j].personagens.filter(p => p.id !== id);
-  }
-
-  resposta = "Deletado";
+else if (msg === "!missao criar" && isAdmin(numero)) {
+  let m = { id: gerarID("M",4), nome: "Missão", concluida:false };
+  missoes.push(m);
+  resposta = `Missão criada (${m.id})`;
 }
 
 // =========================
 // 👑 PAINEL
 // =========================
-
 else if (msg === "!painel" && isAdmin(numero)) {
-
-  resposta = `📊 RPG
+  resposta = `📊 Painel
 
 Jogadores: ${Object.keys(jogadores).length}
 Missões: ${missoes.length}
@@ -434,7 +390,6 @@ Solicitações: ${solicitacoes.length}`;
 // =========================
 // PADRÃO
 // =========================
-
 else {
   resposta = "Use !menu";
 }
