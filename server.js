@@ -6,7 +6,7 @@ app.use(express.urlencoded({ extended: false }));
 // =========================
 // 👑 ADM
 // =========================
-let admins = ["whatsapp:+55SEUNUMERO"];
+let admins = ["whatsapp:+554191656120"];
 
 // =========================
 // 💾 MEMÓRIA
