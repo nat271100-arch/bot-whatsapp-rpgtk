@@ -3,29 +3,32 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 
-const ADMIN = "whatsapp:+554191656120";
+// 👑 ADM
+let admins = ["whatsapp:+554191656120"];
 
 // 💾 MEMÓRIA
 let jogadores = {};
-let aparenciasUsadas = [];
 let estados = {};
+let aparenciasUsadas = [];
+let missoes = [];
+let arcos = [];
+let logs = [];
 
-// 🧚 Afinidades
+// 🧬 AFINIDADES
 const afinidades = {
   "Natureza 🌿": { defesa: 2, vitalidade: 1 },
   "Água 💧": { vitalidade: 2, magia: 1 },
-  "Animais 🐾": { destreza: 2, forca: 1 },
-  "Luz ✨": { magia: 2, defesa: 1 },
-  "Vento 🌬️": { destreza: 2, magia: 1 },
-  "Arte 🎨": { magia: 2, destreza: 1 },
-  "Culinária 🧁": { vitalidade: 2, defesa: 1 },
-  "Tecnologia ⚙️": { defesa: 2, magia: 1 },
   "Fogo 🔥": { forca: 2, destreza: 1 },
-  "Inverno ❄️": { defesa: 2, magia: 1 },
-  "Cura 🌿": { vitalidade: 2, magia: 1 },
-  "Pó mágico ✨": { magia: 2, destreza: 1 },
-  "Sonhos 🌙": { magia: 2, defesa: 1 },
-  "Tempo ⏳": { destreza: 2, magia: 1 }
+  "Luz ✨": { magia: 2, defesa: 1 },
+  "Vento 🌬️": { destreza: 2, magia: 1 }
+};
+
+const simbolosAfinidade = {
+  "Natureza 🌿": "🌿🍃",
+  "Água 💧": "💧🌊",
+  "Fogo 🔥": "🔥🗡️",
+  "Luz ✨": "✨🌟",
+  "Vento 🌬️": "🌬️🌀"
 };
 
 const listaAfinidades = Object.keys(afinidades);
@@ -34,197 +37,174 @@ function sortearAfinidade() {
   return listaAfinidades[Math.floor(Math.random() * listaAfinidades.length)];
 }
 
-function gerarID() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+function gerarID(prefixo, tamanho = 6) {
+  return prefixo + "-" + Math.random().toString(36).substring(2, 2 + tamanho).toUpperCase();
+}
+
+function isAdmin(numero) {
+  return admins.includes(numero);
+}
+
+function buscarPersonagem(id) {
+  for (let num in jogadores) {
+    let p = jogadores[num].personagens.find(x => x.id === id);
+    if (p) return p;
+  }
+  return null;
+}
+
+// 🌑 EVENTO
+function gerarEvento(tipo = "geral") {
+  return `🌑 EVENTO
+
+Algo estranho acontece...
+
+🎭 Situação:
+Instabilidade na região
+
+⚠️ Complicação:
+Ninguém entende a origem
+
+🎯 Ação:
+Investigar ou evitar
+
+✨ Consequência:
+Pode afetar personagens`;
+}
+
+// 🧾 MISSÃO
+function gerarMissao() {
+  return {
+    id: gerarID("M", 4),
+    nome: "Sussurros na Floresta",
+    contexto: "Uma fada desapareceu",
+    objetivo: "Investigar",
+    concluida: false
+  };
 }
 
 // 🤖 BOT
 app.post("/bot", (req, res) => {
+
   const msgOriginal = req.body.Body || "";
   const msg = msgOriginal.toLowerCase();
   const numero = req.body.From;
 
   let resposta = "";
 
-  // CANCELAR
-  if (msg === "!cancelar") {
-    delete estados[numero];
-    resposta = "❌ Criação cancelada.";
-  }
+  // =========================
+  // COMANDOS BÁSICOS
+  // =========================
 
-  // VOLTAR
-  else if (msg === "!voltar") {
-    if (!estados[numero] || estados[numero].historico.length === 0) {
-      resposta = "❌ Não há etapa anterior.";
-    } else {
-      let anterior = estados[numero].historico.pop();
-
-      estados[numero].etapa = anterior.etapa;
-      estados[numero].pontosRestantes = anterior.pontosRestantes;
-      estados[numero].dados = anterior.dados;
-
-      resposta = `⏪ Voltou para: ${estados[numero].etapa}`;
-    }
-  }
-
-  // CRIAR
-  else if (msg === "!criar") {
+  if (msg === "!criar") {
 
     if (!jogadores[numero]) {
-      jogadores[numero] = { personagens: [] };
+      jogadores[numero] = { personagens: [], nomeJogador: "" };
     }
 
     if (jogadores[numero].personagens.length >= 2) {
-      resposta = "❌ Você já possui 2 personagens.";
+      resposta = "❌ Limite de personagens.";
     } else {
       estados[numero] = {
-        etapa: "nome",
+        etapa: jogadores[numero].nomeJogador ? "nome" : "nomeJogador",
         dados: {},
-        pontosRestantes: 20,
-        historico: []
+        pontos: 20
       };
-      resposta = "🧚 Vamos criar sua fada!\nQual o nome?";
+
+      resposta = jogadores[numero].nomeJogador
+        ? "Nome da personagem?"
+        : "Nome do jogador?";
     }
   }
 
-  // FLUXO GUIADO
   else if (estados[numero]) {
-    let estado = estados[numero];
 
-    function salvarHistorico() {
-      estado.historico.push({
-        etapa: estado.etapa,
-        pontosRestantes: estado.pontosRestantes,
-        dados: { ...estado.dados }
-      });
+    let e = estados[numero];
+
+    if (e.etapa === "nomeJogador") {
+      jogadores[numero].nomeJogador = msgOriginal;
+      e.etapa = "nome";
+      resposta = "Nome da personagem?";
     }
 
-    // NOME
-    if (estado.etapa === "nome") {
-      salvarHistorico();
-      estado.dados.nome = msgOriginal;
-      estado.etapa = "idade";
-      resposta = "🎂 Qual a idade?";
+    else if (e.etapa === "nome") {
+      e.dados.nome = msgOriginal;
+      e.etapa = "idade";
+      resposta = "Idade?";
     }
 
-    // IDADE
-    else if (estado.etapa === "idade") {
-      salvarHistorico();
-      estado.dados.idade = msgOriginal;
-      estado.etapa = "aparencia";
-      resposta = "🎭 Descreva a aparência:";
+    else if (e.etapa === "idade") {
+      e.dados.idade = msgOriginal;
+      e.etapa = "aparencia";
+      resposta = "Aparência?";
     }
 
-    // APARÊNCIA
-    else if (estado.etapa === "aparencia") {
-
+    else if (e.etapa === "aparencia") {
       if (aparenciasUsadas.includes(msgOriginal.toLowerCase())) {
-        resposta = "❌ Aparência já usada. Escolha outra.";
+        resposta = "❌ Aparência repetida.";
       } else {
-        salvarHistorico();
-        estado.dados.aparencia = msgOriginal;
+        e.dados.aparencia = msgOriginal;
         aparenciasUsadas.push(msgOriginal.toLowerCase());
-        estado.etapa = "item";
-        resposta = "🎒 Qual seu item inicial?";
+        e.etapa = "item";
+        resposta = "Item inicial?";
       }
     }
 
-    // ITEM
-    else if (estado.etapa === "item") {
-      salvarHistorico();
-      estado.dados.item = msgOriginal;
-      estado.etapa = "vitalidade";
+    else if (e.etapa === "item") {
+      e.dados.item = msgOriginal;
+      e.etapa = "vitalidade";
 
-      resposta = `📊 DISTRIBUIÇÃO DE ATRIBUTOS
+      resposta = `Distribua 20 pontos:
 
-Você tem 20 pontos para distribuir.
+❤️ Vitalidade
+⚔️ Força
+✨ Magia
+🛡️ Defesa
+💨 Destreza
 
-Atributos:
-❤️ Vitalidade (resistência)
-⚔️ Força (dano físico)
-✨ Magia (poder mágico)
-🛡️ Defesa (proteção)
-💨 Destreza (velocidade)
+Mínimo 1
 
-⚠️ Mínimo: 1 por atributo
-
-Começando:
-
-❤️ Quanto em Vitalidade? (Restam 20)`;
+Vitalidade?`;
     }
 
-    // ATRIBUTOS
     else {
-      const atributos = ["vitalidade", "forca", "magia", "defesa", "destreza"];
-      let atual = atributos.find(a => estado.etapa === a);
-
+      const atb = ["vitalidade","forca","magia","defesa","destreza"];
+      let atual = atb.find(x => x === e.etapa);
       let valor = parseInt(msgOriginal);
 
-      if (isNaN(valor) || valor < 1 || valor > estado.pontosRestantes) {
-        resposta = `❌ Valor inválido. Restam ${estado.pontosRestantes}`;
+      if (isNaN(valor) || valor < 1 || valor > e.pontos) {
+        resposta = "❌ Valor inválido";
       } else {
-        salvarHistorico();
 
-        estado.dados[atual] = valor;
-        estado.pontosRestantes -= valor;
+        e.dados[atual] = valor;
+        e.pontos -= valor;
 
-        let index = atributos.indexOf(atual);
+        let i = atb.indexOf(atual);
 
-        if (index < atributos.length - 1) {
-          estado.etapa = atributos[index + 1];
-          resposta = `➡️ ${estado.etapa.toUpperCase()}? (Restam ${estado.pontosRestantes})`;
+        if (i < atb.length - 1) {
+          e.etapa = atb[i+1];
+          resposta = `${e.etapa}? (${e.pontos})`;
         } else {
 
-          // Afinidades
-          let afinidade1 = sortearAfinidade();
-          let afinidade2;
+          let a1 = sortearAfinidade();
+          let a2 = sortearAfinidade();
 
-          do {
-            afinidade2 = sortearAfinidade();
-          } while (afinidade2 === afinidade1);
-
-          let buffs1 = afinidades[afinidade1];
-          let buffs2 = afinidades[afinidade2];
-
-          for (let key in buffs1) {
-            estado.dados[key] += buffs1[key];
-          }
-
-          for (let key in buffs2) {
-            estado.dados[key] += 1;
-          }
-
-          let personagem = {
-            ...estado.dados,
-            id: gerarID(),
-            afinidade1,
-            afinidade2,
+          let p = {
+            ...e.dados,
+            id: gerarID("P",6),
+            afinidade1: a1,
+            afinidade2: a2,
             historia: "",
-            inventario: [estado.dados.item]
+            inventario: [e.dados.item],
+            visual: {}
           };
 
-          jogadores[numero].personagens.push(personagem);
+          jogadores[numero].personagens.push(p);
 
-          resposta = `🧚 FICHA CRIADA!
+          resposta = `🧚 Criado!
 
-👤 ${personagem.nome}
-🆔 ${personagem.id}
-
-🎂 ${personagem.idade}
-
-🎭 ${personagem.aparencia}
-
-✨ ${afinidade1}
-🌟 ${afinidade2}
-
-📊
-❤️ ${personagem.vitalidade}
-⚔️ ${personagem.forca}
-✨ ${personagem.magia}
-🛡️ ${personagem.defesa}
-💨 ${personagem.destreza}
-
-🎒 ${personagem.inventario.join(", ")}`;
+${p.nome}
+${p.id}`;
 
           delete estados[numero];
         }
@@ -232,71 +212,130 @@ Começando:
     }
   }
 
-  // PERFIL
+  // =========================
+  // PLAYER
+  // =========================
+
   else if (msg.startsWith("!perfil")) {
-    let index = parseInt(msg.split(" ")[1]) - 1;
+    let i = parseInt(msg.split(" ")[1]) - 1;
+    let p = jogadores[numero]?.personagens[i];
 
-    if (!jogadores[numero] || !jogadores[numero].personagens[index]) {
-      resposta = "❌ Personagem não encontrado.";
-    } else {
-      let p = jogadores[numero].personagens[index];
-
-      resposta = `📜 ${p.nome}
-
-🆔 ${p.id}
-🎂 ${p.idade}
-
-🎭 ${p.aparencia}
-
-✨ ${p.afinidade1}
-🌟 ${p.afinidade2}
-
-📊
-❤️ ${p.vitalidade}
-⚔️ ${p.forca}
-✨ ${p.magia}
-🛡️ ${p.defesa}
-💨 ${p.destreza}
-
-🎒 ${p.inventario.join(", ")}
-
-📖 ${p.historia || "Sem história"}`;
+    if (!p) resposta = "❌ Não encontrado";
+    else {
+      resposta = `${p.nome} (${p.id})`;
     }
   }
 
-  // HISTÓRIA
-  else if (msg.startsWith("!historia")) {
-    estados[numero] = { etapa: "historia", texto: msgOriginal.slice(10) };
-    resposta = "Qual personagem? 1 ou 2?";
-  }
+  else if (msg.startsWith("!minhaplaca")) {
+    let partes = msgOriginal.split(" ");
+    let campo = partes[1];
+    let valor = partes.slice(2).join(" ");
 
-  else if (estados[numero]?.etapa === "historia") {
-    let index = parseInt(msgOriginal) - 1;
+    let p = jogadores[numero]?.personagens[0];
 
-    if (jogadores[numero]?.personagens[index]) {
-      jogadores[numero].personagens[index].historia = estados[numero].texto;
-      resposta = "📖 História salva!";
-      delete estados[numero];
-    } else {
-      resposta = "❌ Personagem inválido.";
+    if (!p) resposta = "❌ Sem personagem";
+    else {
+      if (!p.visual) p.visual = {};
+      p.visual[campo] = valor;
+      resposta = "🎨 Atualizado";
     }
   }
 
-  // DEFAULT
+  else if (msg.startsWith("!placa")) {
+    let id = msgOriginal.split(" ")[1];
+    let p = buscarPersonagem(id);
+
+    if (!p) resposta = "❌ Não encontrado";
+    else {
+
+      let simbolo = p.visual.simbolo || simbolosAfinidade[p.afinidade1] || "✨🧚";
+      let titulo = p.visual.titulo || "Fada";
+      let frase = p.visual.frase || "";
+
+      resposta = `𖥸𓆰${simbolo}𓆰𖥸
+
+${p.nome} (${p.id})
+${p.idade} anos
+
+${p.aparencia}
+
+${p.afinidade1} | ${p.afinidade2}
+
+${titulo}
+
+${frase}`;
+    }
+  }
+
+  // =========================
+  // EVENTOS
+  // =========================
+
+  else if (msg.startsWith("!evento") && isAdmin(numero)) {
+    resposta = gerarEvento();
+  }
+
+  // =========================
+  // MISSÕES
+  // =========================
+
+  else if (msg === "!missao criar" && isAdmin(numero)) {
+    let m = gerarMissao();
+    missoes.push(m);
+    resposta = `${m.nome} (${m.id})`;
+  }
+
+  else if (msg.startsWith("!missao concluir") && isAdmin(numero)) {
+    let id = msg.split(" ")[2];
+    let m = missoes.find(x => x.id === id);
+    if (m) {
+      m.concluida = true;
+      resposta = "Missão concluída";
+    } else resposta = "Erro";
+  }
+
+  // =========================
+  // ADM
+  // =========================
+
+  else if (msg.startsWith("!del") && isAdmin(numero)) {
+    let id = msg.split(" ")[1];
+
+    for (let j in jogadores) {
+      jogadores[j].personagens = jogadores[j].personagens.filter(p => p.id !== id);
+    }
+
+    resposta = "Deletado";
+  }
+
+  else if (msg.startsWith("!addadm") && isAdmin(numero)) {
+    let novo = msgOriginal.split(" ")[1];
+    admins.push(novo);
+    resposta = "Novo ADM";
+  }
+
+  else if (msg === "!painel" && isAdmin(numero)) {
+
+    let total = Object.keys(jogadores).length;
+
+    resposta = `📊 RPG
+
+Jogadores: ${total}
+Missões: ${missoes.length}
+
+Comandos:
+!missao criar
+!evento
+!del
+!lista`;
+  }
+
   else {
-    resposta = `🧚 Comandos:
-
-!criar
-!perfil 1
-!perfil 2
-!historia texto
-!voltar
-!cancelar`;
+    resposta = "Use !criar";
   }
 
   res.set("Content-Type", "text/xml");
   res.send(`<Response><Message>${resposta}</Message></Response>`);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Servidor rodando"));
+app.listen(3000);
